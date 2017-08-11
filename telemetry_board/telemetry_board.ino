@@ -56,6 +56,13 @@ DHT dht(DHT_PIN, DHTTYPE);
 int led_value = LOW;
 
 
+int last_available = -1;
+int last_peek = -1;
+int last_pin_num = -1;
+int last_pin_status = -1;
+int chars[128];
+int chars_cursor = 0;
+
 void setup() {
   Serial.begin(9600);
   Serial.flush();
@@ -81,9 +88,54 @@ void setup() {
 
   dht.begin();
 
+  last_available = -1;
+  last_peek = -1;
+  last_pin_num = -1;
+  last_pin_status = -1;
+}
+
+void dump_last() {
+  if (chars_cursor > 0) {
+    bool in_quotes = false;
+    for (int i = 0; i < chars_cursor; ++i) {
+      int c = chars[i];
+      bool special = c <= ' ' || c >= 127 || c == '"';
+      if (in_quotes && special) {
+        Serial.println("\"");
+        in_quotes = false;
+      }
+      if (special) {
+        Serial.print("> ");
+        Serial.println(c, DEC);
+        continue;
+      }
+      if (!in_quotes) {
+        Serial.print("\"");
+        in_quotes = true;
+      }
+      Serial.print(static_cast<char>(c));
+    }
+    if (in_quotes) {
+      Serial.println("\"");
+    }
+  }
+
+  
+//  if (last_available <= 0) {
+//    return;
+//  }
+  Serial.print("avail: ");
+  Serial.print(last_available);
+  Serial.print("; peek: ");
+  Serial.print(last_peek);
+  Serial.print("; pin: ");
+  Serial.print(last_pin_num);
+  Serial.print("; status: ");
+  Serial.println(last_pin_status);
 }
 
 void loop() {
+  dump_last();
 
   // Read any serial input
   //    - Input will be two comma separated integers, the
@@ -93,9 +145,38 @@ void loop() {
   //      Example serial input:
   //           4,1   # Turn fan on
   //          13,0   # Turn led off
-  while (Serial.available() > 0) {
+  int this_available;
+  while ((this_available = Serial.available()) > 0) {
+    last_available = this_available;
+    last_peek = Serial.peek();
+
+    do {
+      int c = Serial.read();
+      if (chars_cursor < 128) {
+        chars[chars_cursor++] = c;
+      }
+    } while (Serial.available() > 0);
+    break;
+
+//    static int counter = 0;
+//    if ((counter++ % 10) == 0) {
+//      Serial.print("Input: ");
+//      do {
+//        int c = Serial.read();
+//        Serial.print(c, DEC);
+//      } while (Serial.available() > 0);
+//      return;
+//    }
+    
+    last_available = this_available;
+    last_peek = Serial.peek();
+
     int pin_num = Serial.parseInt();
+    last_pin_num = pin_num;
     int pin_status = Serial.parseInt();
+    last_pin_status = pin_status;
+
+    dump_last();
 
     switch (pin_num) {
       case COMP_RELAY:
