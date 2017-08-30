@@ -25,6 +25,7 @@
 #include <DallasTemperature.h>
 #include <DHT.h>
 
+// How often, in milliseconds, to emit a report.
 #define REPORT_INTERVAL_MS 2000
 
 // Type of Digital Humidity and Temperature (DHT) Sensor
@@ -53,11 +54,14 @@ const int AC_PIN = 11;    // Is there any AC input?
 const int DS18_PIN = 10;  // DS18B20 Temperature (OneWire)
 const int DHT_PIN = 9;    // DHT Temp & Humidity Pin
 
+// Digital output pins
 const int COMP_RELAY = 8;    // Computer Relay: change with caution; it runs the show.
 const int CAMERAS_RELAY = 7; // Cameras Relay Off: 70s Both On: 800s One On: 350
 const int FAN_RELAY = 6;     // Fan Relay  Off: 0 On: 80s
 const int WEATHER_RELAY = 5; // Weather Relay 250mA upon init and 250mA to read
 const int MOUNT_RELAY = 4;   // Mount Relay
+
+OneWire ds(DS18_PIN);
 
 // Utitlity Methods
 
@@ -81,9 +85,9 @@ void toggle_led() {
   toggle_pin(LED_BUILTIN);
 }
 
-// IO Handlers.
-
-OneWire ds(DS18_PIN);
+//////////////////////////////////////////////////////////////////////////////
+// Input Handlers: the support collecting the values of various sensors/pins,
+// and then reporting it later.
 
 class DHTHandler {
   public:
@@ -114,10 +118,11 @@ class DHTHandler {
 
   private:
     DHT dht_;
-    float humidity_ = 0;
-    float temperature_ = 0;  // Celcius
+    float humidity_;
+    float temperature_;  // Celcius
 } dht_handler(DHT_PIN, DHTTYPE);
 
+// DallasTemperatureHandler collects temp values from Dallas One-Wire temp sensors.
 template <size_t kMaxSensors>
 class DallasTemperatureHandler {
   public:
@@ -212,9 +217,86 @@ class DallasTemperatureHandler {
     uint8_t device_count_;
 };
 
+// There are 3 DS18B20 sensors in the Jan 2017 Telemetry Board design.
 DallasTemperatureHandler<3> dt_handler(&ds);
 
+class BaseNameHandler {
+  protected:
+    BaseNameHandler(char* name)
+        : name_(name) {}
 
+    void PrintName() {
+      Serial.print('"');
+      Serial.print(name_);
+      Serial.print("\": ");
+    }
+
+  private:
+    const char* const name_;
+};
+
+class CurrentHandler : public BaseNameHandler {
+  public:
+    CurrentHandler(int pin, char* name, float scale)
+        : BaseNameHandler(name), pin_(pin), scale_(scale) {}
+    void Collect() {
+      reading_ = analogRead(pin_);
+      amps_ = reading_ * scale_;
+    }
+    void ReportReading() {
+      PrintName();
+      Serial.print(reading_);
+    }
+    void ReportAmps() {
+      PrintName();
+      Serial.print(amps_);
+    }
+
+  private:
+    const int pin_;
+    const float scale_;
+
+    int reading_;
+    float amps_;
+};
+
+CurrentHandler current_handlers[] = {
+  {"main", I_MAIN, main_amps_mult},
+  {"fan", I_FAN, fan_amps_mult},
+  {"mount", I_MOUNT, mount_amps_mult},
+  {"cameras", I_CAMERAS, cameras_amps_mult},
+};
+
+class DigitalInputHandler : public BaseNameHandler {
+  public:
+    DigitalInputHandler(char* name, int pin)
+        : BaseNameHandler(name), pin_(pin) {}
+    void Collect() {
+      reading_ = digitalRead(pin_);
+    }
+    void Report() {
+      PrintName();
+      Serial.print(reading_);
+    }
+  private:
+    const int pin_;
+    int reading_;
+};
+
+// One DigitalInputHandler for each of the GPIO pins for which we report the value.
+// Most are actually output pins, but the Arduino API allows us to read the value
+// that is being output.
+DigitalInputHandler di_handlers[] = {
+  {"computer", COMP_RELAY},
+  {"fan", FAN_RELAY},
+  {"mount", MOUNT_RELAY},
+  {"cameras", CAMERAS_RELAY},
+  {"weather", WEATHER_RELAY},
+  {"main", AC_PIN},
+};
+
+// CharBuffer stores characters and supports (minimal) parsing of
+// the buffered characters.
 template <uint8_t kBufferSize>
 class CharBuffer {
 public:
@@ -338,78 +420,6 @@ void HandleSerialInput() {
     }
   }
 }
-
-class BaseNameHandler {
-  protected:
-    BaseNameHandler(char* name)
-        : name_(name) {}
-
-    void PrintName() {
-      Serial.print('"');
-      Serial.print(name_);
-      Serial.print("\": ");
-    }
-
-  private:
-    const char* const name_;
-};
-
-class CurrentHandler : public BaseNameHandler {
-  public:
-    CurrentHandler(int pin, char* name, float scale)
-        : BaseNameHandler(name), pin_(pin), scale_(scale) {}
-    void Collect() {
-      reading_ = analogRead(pin_);
-      amps_ = reading_ * scale_;
-    }
-    void ReportReading() {
-      PrintName();
-      Serial.print(reading_);
-    }
-    void ReportAmps() {
-      PrintName();
-      Serial.print(amps_);
-    }
-
-  private:
-    const int pin_;
-    const float scale_;
-
-    int reading_;
-    float amps_;
-};
-
-CurrentHandler current_handlers[] = {
-  {"main", I_MAIN, main_amps_mult},
-  {"fan", I_FAN, fan_amps_mult},
-  {"mount", I_MOUNT, mount_amps_mult},
-  {"cameras", I_CAMERAS, cameras_amps_mult},
-};
-
-class DigitalInputHandler : public BaseNameHandler {
-  public:
-    DigitalInputHandler(char* name, int pin)
-        : BaseNameHandler(name), pin_(pin) {}
-    void Collect() {
-      reading_ = digitalRead(pin_);
-    }
-    void Report() {
-      PrintName();
-      Serial.print(reading_);
-    }
-  private:
-    const int pin_;
-    int reading_;
-};
-
-DigitalInputHandler di_handlers[] = {
-  {"computer", COMP_RELAY},
-  {"fan", FAN_RELAY},
-  {"mount", MOUNT_RELAY},
-  {"cameras", CAMERAS_RELAY},
-  {"weather", WEATHER_RELAY},
-  {"main", AC_PIN},
-};
 
 // //// Reading temperature or humidity takes about 250 milliseconds!
 // //// Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
