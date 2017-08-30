@@ -110,8 +110,8 @@ class DHTHandler {
     }
 
     void Report() {
-			// This is being added to a JSON dictionary, so print a comma
-			// before the quoted name, which is then followed by a colon.
+      // This is being added to a JSON dictionary, so print a comma
+      // before the quoted name, which is then followed by a colon.
       Serial.print(", \"humidity\":");
       Serial.print(humidity_);
       Serial.print(", \"temp_00\":");
@@ -177,19 +177,19 @@ class DallasTemperatureHandler {
     }
     void Report() {
       if (device_count_ > 0) {
-			// This is being added to a JSON dictionary, so print a comma
-			// before the quoted name, which is then followed by a colon.
-				Serial.print(", \"temperature\":[");
-				for (uint8_t i = 0; i < device_count_; i++) {
-					if (i != 0) {
-						Serial.print(",");
-					}
-					DeviceInfo& device = devices_[i];
-					Serial.print(device.temperature);
-				}
-				Serial.print("]");
-			}
-		}
+        // This is being added to a JSON dictionary, so print a comma
+        // before the quoted name, which is then followed by a colon.
+        Serial.print(", \"temperature\":[");
+        for (uint8_t i = 0; i < device_count_; i++) {
+          if (i != 0) {
+            Serial.print(",");
+          }
+          DeviceInfo& device = devices_[i];
+          Serial.print(device.temperature);
+        }
+        Serial.print("]");
+      }
+    }
 
     void printDeviceInfo() {
       for (uint8_t i = 0; i < device_count_; i++) {
@@ -234,8 +234,8 @@ class BaseNameHandler {
         : name_(name) {}
 
     void PrintName() {
-			// Print quoted name for JSON dictionary key. The decision of
-			// whether to add a comma before this is made by the caller.
+      // Print quoted name for JSON dictionary key. The decision of
+      // whether to add a comma before this is made by the caller.
       Serial.print('"');
       Serial.print(name_);
       Serial.print("\": ");
