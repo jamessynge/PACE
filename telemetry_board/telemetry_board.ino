@@ -220,6 +220,8 @@ class DallasTemperatureHandler {
 // There are 3 DS18B20 sensors in the Jan 2017 Telemetry Board design.
 DallasTemperatureHandler<3> dt_handler(&ds);
 
+// Base class of handlers below which emit a different name for each
+// instance of a sub-class.
 class BaseNameHandler {
   protected:
     BaseNameHandler(char* name)
@@ -294,6 +296,72 @@ DigitalInputHandler di_handlers[] = {
   {"weather", WEATHER_RELAY},
   {"main", AC_PIN},
 };
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// General reporting code.
+
+template<class T, int size> void ReportCollection(const char* name, T(&handlers)[size]) {
+  Serial.print(", \"");
+  Serial.print(name);
+  Serial.print("\": {");
+  bool first = true;
+  for (auto& handler : handlers) {
+    if (first) {
+      first = false;
+    } else {
+      Serial.print(", ");
+    }
+    handler.Report();
+  }
+  Serial.print('}');
+}
+
+template<class T, int size> void PrintCollection(const char* name, T(&handlers)[size], void (T::*mf)()) {
+  Serial.print(", \"");
+  Serial.print(name);
+  Serial.print("\": {");
+  bool first = true;
+  for (auto& handler : handlers) {
+    if (first) {
+      first = false;
+    } else {
+      Serial.print(", ");
+    }
+    (handler.*mf)();
+  }
+  Serial.print('}');
+}
+
+void Report(unsigned long now) {
+  static unsigned long report_num = 0;
+  dht_handler.Collect();
+  dt_handler.Collect();
+
+  for (auto& di_handler : di_handlers) {
+    di_handler.Collect();
+  }
+
+  for (auto& handler : current_handlers) {
+    handler.Collect();
+  }
+
+  // Format/output the results.
+  Serial.print("{\"name\":\"telemetry_board\", count:");
+  Serial.print(millis());
+  Serial.print(", \"num\":");
+  Serial.print(++report_num);
+
+  ReportCollection("power", di_handlers);
+  PrintCollection("current", current_handlers, &CurrentHandler::ReportReading);
+  PrintCollection("amps", current_handlers, &CurrentHandler::ReportAmps);
+  dht_handler.Report();
+  dt_handler.Report();
+
+  Serial.println("}");
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+// Serial Input support
 
 // CharBuffer stores characters and supports (minimal) parsing of
 // the buffered characters.
@@ -421,93 +489,9 @@ void HandleSerialInput() {
   }
 }
 
-// //// Reading temperature or humidity takes about 250 milliseconds!
-// //// Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-// void read_dht_temp() {
-//   float h = dht.readHumidity();
-//   float c = dht.readTemperature(); // Celsius
-
-//   // Check if any reads failed and exit early (to try again).
-//   // if (isnan(h) || isnan(t)) {
-//   //   Serial.println("Failed to read from DHT sensor!");
-//   //   return;
-//   // }
-
-//   Serial.print("\"humidity\":"); Serial.print(h); Serial.print(',');
-//   Serial.print("\"temp_00\":"); Serial.print(c); Serial.print(',');
-// }
-
-// void read_ds18b20_temp() {
-
-//   sensors.requestTemperatures();
-
-//   Serial.print("\"temperature\":[");
-
-//   for (int x = 0; x < NUM_DS18; x++) {
-//     Serial.print(sensors.getTempCByIndex(x)); Serial.print(",");
-//   }
-//   Serial.print("],");
-// }
-
-template<class T, int size> void ReportCollection(const char* name, T(&handlers)[size]) {
-  Serial.print(", \"");
-  Serial.print(name);
-  Serial.print("\": {");
-  bool first = true;
-  for (auto& handler : handlers) {
-    if (first) {
-      first = false;
-    } else {
-      Serial.print(", ");
-    }
-    handler.Report();
-  }
-  Serial.print('}');
-}
-
-template<class T, int size> void PrintCollection(const char* name, T(&handlers)[size], void (T::*mf)()) {
-  Serial.print(", \"");
-  Serial.print(name);
-  Serial.print("\": {");
-  bool first = true;
-  for (auto& handler : handlers) {
-    if (first) {
-      first = false;
-    } else {
-      Serial.print(", ");
-    }
-    (handler.*mf)();
-  }
-  Serial.print('}');
-}
-
-void Report(unsigned long now) {
-  static unsigned long report_num = 0;
-  dht_handler.Collect();
-  dt_handler.Collect();
-
-  for (auto& di_handler : di_handlers) {
-    di_handler.Collect();
-  }
-
-  for (auto& handler : current_handlers) {
-    handler.Collect();
-  }
-
-  // Format/output the results.
-  Serial.print("{\"name\":\"telemetry_board\", count:");
-  Serial.print(millis());
-  Serial.print(", \"num\":");
-  Serial.print(++report_num);
-
-  ReportCollection("power", di_handlers);
-  PrintCollection("current", current_handlers, &CurrentHandler::ReportReading);
-  PrintCollection("amps", current_handlers, &CurrentHandler::ReportAmps);
-  dht_handler.Report();
-  dt_handler.Report();
-
-  Serial.println("}");
-}
+//////////////////////////////////////////////////////////////////////////////////
+// Primary Arduino defined methods: setup(), called once at start, and loop(),
+// called repeatedly (roughly as soon as it returns).
 
 void setup() {
   Serial.begin(9600);
