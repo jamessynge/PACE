@@ -300,6 +300,8 @@ DigitalInputHandler di_handlers[] = {
 /////////////////////////////////////////////////////////////////////////////////////////
 // General reporting code.
 
+// Due to limitations of the Arduino preprocessor,
+// we must place the following all on one line:
 template<class T, int size> void ReportCollection(const char* name, T(&handlers)[size]) {
   Serial.print(", \"");
   Serial.print(name);
@@ -316,6 +318,8 @@ template<class T, int size> void ReportCollection(const char* name, T(&handlers)
   Serial.print('}');
 }
 
+// Due to limitations of the Arduino preprocessor,
+// we must place the following all on one line:
 template<class T, int size> void PrintCollection(const char* name, T(&handlers)[size], void (T::*mf)()) {
   Serial.print(", \"");
   Serial.print(name);
@@ -332,20 +336,22 @@ template<class T, int size> void PrintCollection(const char* name, T(&handlers)[
   Serial.print('}');
 }
 
+// Produce a single JSON line with the current values reported by
+// the sensors and the settings of the relays.
 void Report(unsigned long now) {
   static unsigned long report_num = 0;
+
+  // Collect values from all of the sensors & replays.
   dht_handler.Collect();
   dt_handler.Collect();
-
   for (auto& di_handler : di_handlers) {
     di_handler.Collect();
   }
-
   for (auto& handler : current_handlers) {
     handler.Collect();
   }
 
-  // Format/output the results.
+  // Print the collected values as JSON.
   Serial.print("{\"name\":\"telemetry_board\", count:");
   Serial.print(millis());
   Serial.print(", \"num\":");
@@ -361,7 +367,7 @@ void Report(unsigned long now) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////
-// Serial Input support
+// Serial input support
 
 // CharBuffer stores characters and supports (minimal) parsing of
 // the buffered characters.
