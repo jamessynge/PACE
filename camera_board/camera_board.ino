@@ -203,7 +203,7 @@ void main_loop() {
     bool cam1 = digitalRead(CAM_1_RELAY);
 
     // Format/output the results.
-    Serial.print("{\"name\":\"camera_board\", count:");
+    Serial.print("{\"name\":\"camera_board\", \"count\":");
     led_handler.update();
     Serial.print(millis() - end_setup_millis);
     led_handler.update();
