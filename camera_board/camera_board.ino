@@ -3,13 +3,18 @@
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
+//#include <accelerometer_handler.h>
+//#include <led_handler.h>
+//#include <dht_handler.h>
+
 
 const int DHT_PIN = 9;      // DHT Temp & Humidity Pin
 const int CAM_0_RELAY = 5;
 const int CAM_1_RELAY = 6;
 const int RESET_PIN = 12;
-
-// Utitlity Methods
+/************************************
+  Utitlity Methods
+*************************************/
 
 void toggle_led() {
   digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
@@ -22,6 +27,7 @@ void turn_pin_on(int pin_num) {
 void turn_pin_off(int pin_num) {
   digitalWrite(pin_num, LOW);
 }
+
 
 // IO Handlers.
 
@@ -108,6 +114,9 @@ class DHTHandler {
     float humidity_ = 0;
     float temperature_ = 0;  // Celcius
 } dht_handler;
+
+//DHTHandler dht_handler(DHT_PIN, DHT22);  // AM2302
+
 
 unsigned long end_setup_millis;
 unsigned long next_report_millis;
